@@ -5,72 +5,217 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:MicroRun"
         mc:Ignorable="d"
-        Title="ProjectsLoader" Height="450" Width="800">
-    <StackPanel Margin="10">
-        <!-- Header -->
-        <TextBlock Text="Project Launcher" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+        Title="Project Launcher" Height="500" Width="900" Background="#1E1E1E" Foreground="White">
 
-        <!-- File List Section -->
-        <ItemsControl x:Name="FilesList">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
-                        <!-- File Path TextBox -->
-                        <TextBox Text="{Binding FileName}" IsReadOnly="True" Width="200" Margin="0,0,5,0"/>
-
-                        <!-- Browse Button -->
-                        <Button Content="Browse..." Click="BrowseButton_Click" Margin="0,0,5,0" Tag="{Binding}"/>
-
-                        <!-- Configuration ComboBox -->
-                        <ComboBox ItemsSource="{Binding Configurations}" SelectedItem="{Binding SelectedConfiguration}" Width="150" Margin="0,0,5,0"/>
-
-                        <!-- Start/Stop Button -->
-                        <Button Click="StartStopButton_Click" Tag="{Binding}">
-                            <Button.Style>
-                                <Style TargetType="Button">
-                                    <Setter Property="Content" Value="{Binding StartStopButtonText}" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsButtonLoading}" Value="True">
-                                            <Setter Property="Content">
-                                                <Setter.Value>
-                                                    <ProgressBar IsIndeterminate="True" Width="20" Height="20" />
-                                                </Setter.Value>
-                                            </Setter>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
-
-
-                        <Button Content="X" Foreground="Red" Click="RemoveFile_Click" Tag="{Binding}" />
-
-
-                    </StackPanel>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
-
-        <!-- Add File Button -->
-        <Button Content=" + " Click="AddFileButton_Click" HorizontalAlignment="Center" Width="30" Height="30" Margin="0,10,0,0">
-            <Button.Style>
-                <Style TargetType="Button">
-                    <Setter Property="Template">
-                        <Setter.Value>
-                            <ControlTemplate TargetType="Button">
-                                <Border Background="{TemplateBinding Background}" 
+    <Window.Resources>
+        <Style x:Key="ModernButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#3A3A3A"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
                                 BorderBrush="{TemplateBinding BorderBrush}" 
                                 BorderThickness="{TemplateBinding BorderThickness}" 
-                                CornerRadius="10">
-                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                CornerRadius="5">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#555"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#444"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <ControlTemplate x:Key="ComboBoxToggleButtonTemplate" TargetType="ToggleButton">
+            <Border 
+        Name="Border"
+        Background="{TemplateBinding Background}"
+        BorderBrush="{TemplateBinding BorderBrush}"
+        BorderThickness="0"
+        CornerRadius="5">
+                <Grid>
+                    <ContentPresenter 
+                HorizontalAlignment="Left" 
+                VerticalAlignment="Center"
+                Margin="5,0,25,0"
+                Content="{TemplateBinding Content}"
+                IsHitTestVisible="False"/>
+                    <Path
+                Name="Arrow"
+                Data="M 0 0 L 4 4 L 8 0 Z"
+                Fill="White"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                Margin="0,0,10,0"/>
+                </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Border" Property="Background" Value="#555"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter TargetName="Border" Property="Background" Value="#444"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <!--<Setter Property="Foreground" Value="Gray"/>-->
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <!-- Updated ModernComboBoxStyle -->
+        <Style x:Key="ModernComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Background" Value="#3A3A3A"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#444"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <!-- ToggleButton -->
+                            <ToggleButton 
+                        Name="ToggleButton"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        Foreground="{TemplateBinding Foreground}"
+                        FontSize="{TemplateBinding FontSize}"
+                        IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                        ClickMode="Press"
+                        Focusable="False"
+                        Template="{StaticResource ComboBoxToggleButtonTemplate}">
+                            </ToggleButton>
+
+                            <!-- ContentPresenter -->
+                            <ContentPresenter
+                        Name="ContentSite"
+                        IsHitTestVisible="False"
+                        Content="{TemplateBinding SelectionBoxItem}"
+                        ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                        ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                        Margin="{TemplateBinding Margin}"
+
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Left"/>
+
+                            <!-- Popup -->
+                            <Popup 
+                        Name="Popup"
+                        Placement="Bottom"
+                        IsOpen="{TemplateBinding IsDropDownOpen}"
+                        AllowsTransparency="True"
+                        Focusable="False"
+                        PopupAnimation="Slide">
+                                <Border 
+                            x:Name="DropDownBorder"
+                            Background="#3A3A3A"
+                            BorderBrush="#444"
+                            BorderThickness="1"
+                            CornerRadius="5">
+                                    <ScrollViewer 
+                                Margin="4,6,4,6" 
+                                SnapsToDevicePixels="True">
+                                        <StackPanel 
+                                    IsItemsHost="True" 
+                                    KeyboardNavigation.DirectionalNavigation="Contained" />
+                                    </ScrollViewer>
                                 </Border>
-                            </ControlTemplate>
-                        </Setter.Value>
-                    </Setter>
-                </Style>
-            </Button.Style>
-        </Button>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="HasItems" Value="False">
+                                <Setter TargetName="DropDownBorder" Property="MinHeight" Value="95"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="Gray"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="BorderBrush" Value="#555"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter Property="BorderBrush" Value="#555"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
 
-    </StackPanel>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Text="Project Launcher" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" Grid.Row="0" Margin="0,0,0,20"/>
+
+        <!-- File List Section -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="FilesList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderThickness="1" BorderBrush="#444" CornerRadius="5" Margin="0,10" Padding="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="2*"/>
+                                    <ColumnDefinition Width="0.5*"/>
+                                    <ColumnDefinition Width="0.4*"/>
+                                    <ColumnDefinition Width="0.5*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- File Path TextBox -->
+                                <!--<TextBox Text="{Binding FileName}" IsReadOnly="True" Margin="5" Grid.Column="0" VerticalAlignment="Center"/>-->
+                                <Border Background="#3a3a3a" CornerRadius="5" Padding="5" Margin="5" Grid.Column="0" VerticalAlignment="Center">
+
+                                    <TextBlock Text="{Binding FileName}" Margin="5" VerticalAlignment="Center"/>
+                                </Border>
+
+                                <!-- Browse Button -->
+                                <Button Content="Browse..." Click="BrowseButton_Click" Grid.Column="1" Margin="5" Tag="{Binding}" Style="{StaticResource ModernButtonStyle}"/>
+
+                                <!-- Configuration ComboBox -->
+                                <ComboBox ItemsSource="{Binding Configurations}" SelectedItem="{Binding SelectedConfiguration}" Grid.Column="2" Margin="5" VerticalAlignment="Center" Style="{StaticResource ModernComboBoxStyle}"/>
+
+                                <!-- Start/Stop Button -->
+                                <!-- Start/Stop Button -->
+
+                                <Button Grid.Column="3" Margin="5" Content="{Binding StartStopButtonText}" Click="StartStopButton_Click" Tag="{Binding}" Style="{StaticResource ModernButtonStyle}" />
+                                <!--<ProgressBar IsIndeterminate="True" Width="20" Height="20" Visibility="{Binding IsButtonLoading, Converter={StaticResource BooleanToVisibilityConverter}}" HorizontalAlignment="Center" VerticalAlignment="Center"/>-->
+
+
+                                <!-- Remove File Button -->
+                                <Button Content="X" Foreground="Red" Click="RemoveFile_Click" Tag="{Binding}" Grid.Column="4" Margin="5" Width="40" Height="40" Style="{StaticResource ModernButtonStyle}"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Add File Button -->
+        <Button Content="Add Project" Click="AddFileButton_Click" Grid.Row="2" HorizontalAlignment="Center" Width="120" Height="40" Margin="0,20,0,0" Style="{StaticResource ModernButtonStyle}"/>
+    </Grid>
 </Window>
