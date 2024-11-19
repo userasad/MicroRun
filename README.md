@@ -15,7 +15,7 @@
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/MicroRun.git
+   git clone https://github.com/userasad/MicroRun.git
    ```
 
 2. Open the solution in Visual Studio.
@@ -43,4 +43,5 @@ Contributions are welcome! To contribute to the project, follow these steps:
 
 ## License
 
-This project is licensed under the Apache 2.0 License
+This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
+
