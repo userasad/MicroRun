@@ -166,6 +166,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Header -->
@@ -179,6 +180,7 @@
                         <Border BorderThickness="1" BorderBrush="#444" CornerRadius="5" Margin="0,10" Padding="10">
                             <Grid>
                                 <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="0.1*"/>
                                     <ColumnDefinition Width="2*"/>
                                     <ColumnDefinition Width="0.5*"/>
                                     <ColumnDefinition Width="0.4*"/>
@@ -188,26 +190,29 @@
 
                                 <!-- File Path TextBox -->
                                 <!--<TextBox Text="{Binding FileName}" IsReadOnly="True" Margin="5" Grid.Column="0" VerticalAlignment="Center"/>-->
-                                <Border Background="#3a3a3a" CornerRadius="5" Padding="5" Margin="5" Grid.Column="0" VerticalAlignment="Center">
+                                <!-- CheckBox -->
+                                <CheckBox IsChecked="{Binding IsChecked}" Tag="{Binding}" Click="CheckBoxButton_Click" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,5,0" />
+
+                                <Border Background="#3a3a3a" CornerRadius="5" Padding="5" Margin="5" Grid.Column="1" VerticalAlignment="Center">
 
                                     <TextBlock Text="{Binding FileName}" Margin="5" VerticalAlignment="Center"/>
                                 </Border>
 
                                 <!-- Browse Button -->
-                                <Button Content="Browse..." Click="BrowseButton_Click" Grid.Column="1" Margin="5" Tag="{Binding}" Style="{StaticResource ModernButtonStyle}"/>
+                                <Button Content="Browse..." Click="BrowseButton_Click" Grid.Column="2" Margin="5" Tag="{Binding}" Style="{StaticResource ModernButtonStyle}"/>
 
                                 <!-- Configuration ComboBox -->
-                                <ComboBox ItemsSource="{Binding Configurations}" SelectedItem="{Binding SelectedConfiguration}" Grid.Column="2" Margin="5" VerticalAlignment="Center" Style="{StaticResource ModernComboBoxStyle}"/>
+                                <ComboBox ItemsSource="{Binding Configurations}" SelectedItem="{Binding SelectedConfiguration}" Grid.Column="3" Margin="5" VerticalAlignment="Center" Style="{StaticResource ModernComboBoxStyle}"/>
 
                                 <!-- Start/Stop Button -->
                                 <!-- Start/Stop Button -->
 
-                                <Button Grid.Column="3" Margin="5" Content="{Binding StartStopButtonText}" Click="StartStopButton_Click" Tag="{Binding}" Style="{StaticResource ModernButtonStyle}" />
+                                <Button Grid.Column="4" Margin="5" Content="{Binding StartStopButtonText}" Click="StartStopButton_Click" Tag="{Binding}" Style="{StaticResource ModernButtonStyle}" />
                                 <!--<ProgressBar IsIndeterminate="True" Width="20" Height="20" Visibility="{Binding IsButtonLoading, Converter={StaticResource BooleanToVisibilityConverter}}" HorizontalAlignment="Center" VerticalAlignment="Center"/>-->
 
 
                                 <!-- Remove File Button -->
-                                <Button Content="X" Foreground="Red" Click="RemoveFile_Click" Tag="{Binding}" Grid.Column="4" Margin="5" Width="40" Height="40" Style="{StaticResource ModernButtonStyle}"/>
+                                <Button Content="X" Foreground="Red" Click="RemoveFile_Click" Tag="{Binding}" Grid.Column="5" Margin="5" Width="40" Height="40" Style="{StaticResource ModernButtonStyle}"/>
                             </Grid>
                         </Border>
                     </DataTemplate>
@@ -217,5 +222,6 @@
 
         <!-- Add File Button -->
         <Button Content="Add Project" Click="AddFileButton_Click" Grid.Row="2" HorizontalAlignment="Center" Width="120" Height="40" Margin="0,20,0,0" Style="{StaticResource ModernButtonStyle}"/>
+        <Button x:Name="StartAllProject"  Click="StartAllProject_Click"  Grid.Row="3" HorizontalAlignment="Center" Width="120" Height="40" Margin="0,20,0,0" Style="{StaticResource ModernButtonStyle}"/>
     </Grid>
 </Window>

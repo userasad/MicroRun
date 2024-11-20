@@ -11,8 +11,7 @@ using Microsoft.Build.Execution;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Locator;
 using Microsoft.Build.Logging;
-using Microsoft.Win32;
-using NetCoreProjectLauncher;
+
 
 
 namespace MicroRun
@@ -23,13 +22,18 @@ namespace MicroRun
         public ObservableCollection<string> Configurations { get; set; } = new ObservableCollection<string>();
         private Dictionary<string, LaunchProfile> launchProfiles;
         private Dictionary<string, Process> runningProcesses = new Dictionary<string, Process>();
-        private string path = @"C:\Users\USER\Documents\SavedFile.json";
+        private static readonly string path = Path.Combine(
+           Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+           "SavedFile.json"
+       );
+        private bool isStartAllProject = false;
         public ProjectsLoader()
         {
             InitializeComponent();
             FilesList.ItemsSource = Files;
             RegisterMSBuild();
             loadMultipleFile();
+            StartAllProject.Content = "Start All Projects";
         }
 
        public async void loadMultipleFile() {
@@ -57,48 +61,26 @@ namespace MicroRun
             var newFile = new FileViewModel();
             Files.Add(newFile);
         }
-        public async Task SaveToStorageAsync(FileViewModel newFileViewModel, string filePath)
+        public async Task SaveToStorageAsync(ObservableCollection<FileViewModel> fileViewModels, string filePath)
         {
-            // Ensure the file exists
-            if (!File.Exists(filePath))
-            {
-                // If the file does not exist, create it with an empty list
-                var emptyListJson = JsonSerializer.Serialize(new List<FileViewModel>(), new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(filePath, emptyListJson);
-            }
+            try {
+                if (!File.Exists(filePath))
+                {
+                    // If the file does not exist, create it with an empty list
+                    var emptyListJson = JsonSerializer.Serialize(new List<FileViewModel>(), new JsonSerializerOptions { WriteIndented = true });
+                    await File.WriteAllTextAsync(filePath, emptyListJson);
+                }
 
-            // Load the existing list from the file
-            var existingJson = await File.ReadAllTextAsync(filePath);
-            var options = new JsonSerializerOptions { WriteIndented = true };
+                // Load the existing list from the file
+                var existingJson = await File.ReadAllTextAsync(filePath);
+                var options = new JsonSerializerOptions { WriteIndented = true };
 
-            List<FileViewModel> fileViewModels;
-            try
-            {
-                fileViewModels = JsonSerializer.Deserialize<List<FileViewModel>>(existingJson, options) ?? new List<FileViewModel>();
+                var updatedJson = JsonSerializer.Serialize(fileViewModels, options);
+                await File.WriteAllTextAsync(filePath, updatedJson);
+            } catch (Exception ex) {
+                MessageBox.Show("Something went wrong.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
-            catch
-            {
-                // If deserialization fails, initialize an empty list
-                fileViewModels = new List<FileViewModel>();
-            }
-
-            // Find if the object already exists by FilePath
-            var existingFile = fileViewModels.FirstOrDefault(f => f.FilePath == newFileViewModel.FilePath);
-            if (existingFile != null)
-            {
-                // Update the existing object
-                var index = fileViewModels.IndexOf(existingFile);
-                fileViewModels[index] = newFileViewModel;
-            }
-            else
-            {
-                // Add the new object to the list
-                fileViewModels.Add(newFileViewModel);
-            }
-
-            // Save the updated list back to the file
-            var updatedJson = JsonSerializer.Serialize(fileViewModels, options);
-            await File.WriteAllTextAsync(filePath, updatedJson);
+                      
         }
 
 
@@ -121,107 +103,165 @@ namespace MicroRun
             if (fileViewModel != null)
             {
 
-                var dlg = new Microsoft.Win32.OpenFileDialog
-                {
-                    Filter = "C# Project Files (*.csproj)|*.csproj",
-                    Title = "Select .NET Core Project"
-                };
-                if (dlg.ShowDialog() == true)
-                {
 
-                    
-                    //var newFile = new FileViewModel();
-                    //Files.Add(newFile);
-                    fileViewModel.FilePath = dlg.FileName;
+                try {
+                    var dlg = new Microsoft.Win32.OpenFileDialog
+                    {
+                        Filter = "C# Project Files (*.csproj)|*.csproj",
+                        Title = "Select .NET Core Project"
+                    };
+                    if (dlg.ShowDialog() == true)
+                    {
+                        //var newFile = new FileViewModel();
+                        //Files.Add(newFile);
+                        fileViewModel.FilePath = dlg.FileName;
 
-                    //newFile.FilePath = dlg.FileName;
-                    //LoadLaunchConfigurations(newFile);
-                    LoadLaunchConfigurations(fileViewModel);
+                        //newFile.FilePath = dlg.FileName;
+                        //LoadLaunchConfigurations(newFile);
+                        SaveToStorageAsync(Files, path);
+                        LoadLaunchConfigurations(fileViewModel);
 
+                    }
+                }
+                catch(Exception ex) {
+                    MessageBox.Show("SomeThing went wrong", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
 
         public async Task<FileViewModel> LoadFromStorageAsync(string filePath)
         {
-            if (!File.Exists(filePath))
+            try
+            {
+                if (!File.Exists(filePath))
+                    return null;
+
+                var json = await File.ReadAllTextAsync(filePath);
+                return JsonSerializer.Deserialize<FileViewModel>(json);
+            }catch(Exception ex)
+            {
                 return null;
 
-            var json = await File.ReadAllTextAsync(filePath);
-            return JsonSerializer.Deserialize<FileViewModel>(json);
+            }
         }
 
         // Load configurations for a specific file
         private void LoadLaunchConfigurations(FileViewModel file)
         {
-            file.Configurations.Clear();
-            string launchSettingsPath = Path.Combine(Path.GetDirectoryName(file.FilePath), "Properties", "launchSettings.json");
-            if (File.Exists(launchSettingsPath))
+            try
             {
-                SaveToStorageAsync(file, path);
-                string jsonText = File.ReadAllText(launchSettingsPath);
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                var launchSettings = JsonSerializer.Deserialize<LaunchSettings>(jsonText, options);
-                launchProfiles = launchSettings?.Profiles;
-
-                if (launchProfiles != null)
+                file.Configurations.Clear();
+                string launchSettingsPath = Path.Combine(Path.GetDirectoryName(file.FilePath), "Properties", "launchSettings.json");
+                if (File.Exists(launchSettingsPath))
                 {
-                    foreach (var profile in launchProfiles.Keys)
+
+                    string jsonText = File.ReadAllText(launchSettingsPath);
+                    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    var launchSettings = JsonSerializer.Deserialize<LaunchSettings>(jsonText, options);
+                    launchProfiles = launchSettings?.Profiles;
+
+                    if (launchProfiles != null)
                     {
-                        file.Configurations.Add(profile);
+                        foreach (var profile in launchProfiles.Keys)
+                        {
+                            file.Configurations.Add(profile);
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show("No launch profiles found in launchSettings.json.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
                 else
                 {
-                    MessageBox.Show("No launch profiles found in launchSettings.json.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show("launchSettings.json not found in the project.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
-            else
-            {
-                MessageBox.Show("launchSettings.json not found in the project.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            catch (Exception ex) {
+                MessageBox.Show("No launch profiles found in launchSettings.json.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        // "Start" button click event for each file
-        //private void StartButton_Click(object sender, RoutedEventArgs e)
-        //{
-        //    var fileViewModel = ((Button)sender).Tag as FileViewModel;
+        private async void StartAllProject_Click(object sender, RoutedEventArgs e)
+        {
+            if (!isStartAllProject)
+            {
+                foreach (var fileViewModel in Files)
+                {
+                    if (fileViewModel.IsChecked)
+                    {
+                        var selectedProfile = launchProfiles[fileViewModel.SelectedConfiguration];
+                        StartProject(fileViewModel, selectedProfile);
+                        fileViewModel.IsProcessRunning = true;
+                    }
+                }
+                    StartAllProject.Content = "Stop All Projects";
+                    isStartAllProject = true;
+            }
+            else
+            {
+                foreach (var fileViewModel in Files)
+                {
+                    if (fileViewModel.IsChecked&&fileViewModel.IsProcessRunning)
+                    {
+                        StopProject(fileViewModel.FilePath);
+                        fileViewModel.IsProcessRunning = false;
+                    }
+                StartAllProject.Content = "Start All Projects";
+                isStartAllProject = false;
+                }
 
-        //    if (fileViewModel == null || string.IsNullOrEmpty(fileViewModel.FilePath) || string.IsNullOrEmpty(fileViewModel.SelectedConfiguration))
-        //    {
-        //        MessageBox.Show("Please select a project and a configuration to start.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-        //        return;
-        //    }
+            }
+        }
 
-        //    // Use fileViewModel.FilePath and fileViewModel.SelectedConfiguration to start the project
-        //    var selectedProfile = launchProfiles[fileViewModel.SelectedConfiguration];
-        //    StartProject(fileViewModel, selectedProfile);
-        //}
 
         private async void StartStopButton_Click(object sender, RoutedEventArgs e)
         {
-            var fileViewModel = ((Button)sender).Tag as FileViewModel;
-            fileViewModel.IsButtonLoading = true;
-            if (fileViewModel == null)
-                return;
+            try {
+                var fileViewModel = ((Button)sender).Tag as FileViewModel;
+                fileViewModel.IsButtonLoading = true;
+                if (fileViewModel == null)
+                    return;
 
-            SaveToStorageAsync(fileViewModel, path);
-            if (fileViewModel.IsProcessRunning)
-            {
-                // Stop the process
-                StopProject(fileViewModel.FilePath);
-                fileViewModel.IsProcessRunning = false;
-            }
-            else
-            {
-                // Start the process
-                var selectedProfile = launchProfiles[fileViewModel.SelectedConfiguration];
-                StartProject(fileViewModel, selectedProfile);
-                fileViewModel.IsProcessRunning = true;
-            }
+                SaveToStorageAsync(Files, path);
+                if (fileViewModel.IsProcessRunning)
+                {
+                    // Stop the process
+                    StopProject(fileViewModel.FilePath);
+                    fileViewModel.IsProcessRunning = false;
+                }
+                else
+                {
+                    // Start the process
+                    var selectedProfile = launchProfiles[fileViewModel.SelectedConfiguration];
+                    StartProject(fileViewModel, selectedProfile);
+                    fileViewModel.IsProcessRunning = true;
+                }
 
-            fileViewModel.IsButtonLoading = false;
+                fileViewModel.IsButtonLoading = false;
+            }
+            catch(Exception ex)
+            {
+                MessageBox.Show("No start project.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
+       
+        
+        //CehckBox Button Click
+        private async void CheckBoxButton_Click(object sender, RoutedEventArgs e) {
+            var checkBox = sender as CheckBox;
+            var fileViewModel = checkBox?.Tag as FileViewModel;
+            if (fileViewModel != null && fileViewModel.IsChecked)
+            {
+                fileViewModel.IsChecked = true;
+            }
+            else {
+                fileViewModel.IsChecked = false;
+            }
+
+           await SaveToStorageAsync(Files, path);
+        }
+
 
         //Rmove the FileViewModel
 
@@ -229,91 +269,127 @@ namespace MicroRun
         {
             var fileViewModel = ((Button)sender).Tag as FileViewModel;
             Files.Remove(fileViewModel);
-            
+            await SaveToStorageAsync(Files, path);
+
         }
 
         // Starts the specified project with the given launch profile
         private void StartProject(FileViewModel fileViewModel, LaunchProfile profile)
         {
-            if (string.IsNullOrEmpty(fileViewModel.FilePath) || fileViewModel.SelectedConfiguration == null)
-            {
-                MessageBox.Show("Please select a project and a launch configuration.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
+            try {
 
-            // Build the project
-            BuildProject(fileViewModel);
-            // Get the selected launch profile
-            var selectedProfileName = fileViewModel.SelectedConfiguration;
-            var launchProfile = launchProfiles[selectedProfileName];
-            // Determine the command to run based on the commandName
-            string commandName = launchProfile.CommandName;
-            string arguments = "";
-            if (commandName == "Project")
-            {
-                // Run the DLL with dotnet
-                arguments = $"\"{GetOutputDllPath(fileViewModel.FilePath)}\"";
-            }
-            else if (commandName == "IISExpress")
-            {
-                // Start IIS Express with the application URL
-                string iisExpressPath = GetIISExpressPath();
-                if (iisExpressPath == null)
+                if (string.IsNullOrEmpty(fileViewModel.FilePath) || fileViewModel.SelectedConfiguration == null)
                 {
-                    MessageBox.Show("IIS Express not found.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show("Please select a project and a launch configuration.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
-                string sitePath = Path.GetDirectoryName(fileViewModel.FilePath);
-                string appUrl = launchProfile.ApplicationUrl ?? "http://localhost:8080";
-                var iisArguments = $"/path:\"{sitePath}\" /port:{GetPortFromUrl(appUrl)}";
-                StartProcess(fileViewModel.FilePath, iisExpressPath, iisArguments, launchProfile);
-                return;
+
+                // Build the project
+                try
+                {
+                    BuildProject(fileViewModel);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error building the project: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                // Get the selected launch profile
+                var selectedProfileName = fileViewModel.SelectedConfiguration;
+                var launchProfile = launchProfiles[selectedProfileName];
+                // Determine the command to run based on the commandName
+                string commandName = launchProfile.CommandName;
+                string arguments = "";
+                if (commandName == "Project")
+                {
+                    // Run the DLL with dotnet
+                    arguments = $"\"{GetOutputDllPath(fileViewModel.FilePath)}\"";
+                }
+                else if (commandName == "IISExpress")
+                {
+                    // Start IIS Express with the application URL
+                    string iisExpressPath = GetIISExpressPath();
+                    if (iisExpressPath == null)
+                    {
+                        MessageBox.Show("IIS Express not found.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+                    string sitePath = Path.GetDirectoryName(fileViewModel.FilePath);
+                    string appUrl = launchProfile.ApplicationUrl ?? "http://localhost:8080";
+                    var iisArguments = $"/path:\"{sitePath}\" /port:{GetPortFromUrl(appUrl)}";
+                    StartProcess(fileViewModel.FilePath, iisExpressPath, iisArguments, launchProfile);
+                    return;
+                }
+                else
+                {
+                    MessageBox.Show($"Unsupported commandName: {commandName}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+                // Append command-line arguments from the launch profile
+                if (!string.IsNullOrEmpty(launchProfile.CommandLineArgs))
+                {
+                    arguments += $" {launchProfile.CommandLineArgs}";
+                }
+                StartProcess(fileViewModel.FilePath, "dotnet", arguments, launchProfile);
             }
-            else
+            catch(Exception ex)
             {
-                MessageBox.Show($"Unsupported commandName: {commandName}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
+                MessageBox.Show($"Something want wrong.: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
-            // Append command-line arguments from the launch profile
-            if (!string.IsNullOrEmpty(launchProfile.CommandLineArgs))
-            {
-                arguments += $" {launchProfile.CommandLineArgs}";
-            }
-            StartProcess(fileViewModel.FilePath, "dotnet", arguments, launchProfile);
         }
 
         private void StartProcess(string projectPath, string fileName, string arguments, LaunchProfile launchProfile)
         {
-            var startInfo = new ProcessStartInfo
+            try
             {
-                FileName = fileName,
-                Arguments = arguments,
-                UseShellExecute = false,
-                CreateNoWindow = false,
-                WorkingDirectory = Path.GetDirectoryName(projectPath)
-            };
-            // Set environment variables
-            if (launchProfile.EnvironmentVariables != null)
-            {
-                foreach (var envVar in launchProfile.EnvironmentVariables)
+                var startInfo = new ProcessStartInfo
                 {
-                    startInfo.Environment[envVar.Key] = envVar.Value;
+                    FileName = fileName,
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    CreateNoWindow = false,
+                    WorkingDirectory = Path.GetDirectoryName(projectPath)
+                };
+                // Set environment variables
+                if (launchProfile.EnvironmentVariables != null)
+                {
+                    foreach (var envVar in launchProfile.EnvironmentVariables)
+                    {
+                        startInfo.Environment[envVar.Key] = envVar.Value;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(launchProfile.ApplicationUrl))
+                {
+                    startInfo.Environment["ASPNETCORE_URLS"] = launchProfile.ApplicationUrl;
+                }
+                // Start the process
+                // Set environment variables and start the process
+                runningProcesses[projectPath] = Process.Start(startInfo);
+
+                try
+                {
+                    // Launch the default browser to the specified URL
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = launchProfile.ApplicationUrl,
+                        UseShellExecute = true // Required for opening URLs in a browser
+                    });
+                }
+                catch (Exception ex)
+                {
+                    // Handle potential exceptions (e.g., invalid URL format)
+                    Console.WriteLine($"Failed to launch browser: {ex.Message}");
+                }
+                // Update the IsRunning flag in the view model
+                var fileViewModel = Files.FirstOrDefault(f => f.FilePath == projectPath);
+                if (fileViewModel != null)
+                {
+                    fileViewModel.IsProcessRunning = true;
                 }
             }
+            catch (Exception ex) {
 
-            if (!string.IsNullOrEmpty(launchProfile.ApplicationUrl))
-            {
-                startInfo.Environment["ASPNETCORE_URLS"] = launchProfile.ApplicationUrl;
-            }
-            // Start the process
-            // Set environment variables and start the process
-            runningProcesses[projectPath] = Process.Start(startInfo);
-
-            // Update the IsRunning flag in the view model
-            var fileViewModel = Files.FirstOrDefault(f => f.FilePath == projectPath);
-            if (fileViewModel != null)
-            {
-                fileViewModel.IsProcessRunning = true;
+                MessageBox.Show($"Something went wrong: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -416,11 +492,14 @@ namespace MicroRun
 
     public class FileViewModel : INotifyPropertyChanged
     {
+        [JsonIgnore]
         private bool isButtonLoading;
+        private bool isChecked=false;
         private string filePath;
         private string selectedConfiguration;
         private string startStopButtonText = "Start"; // Default text for the button
-        private bool isProcessRunning = false; // Flag to track if the process is running
+        private bool isProcessRunning = false;// Flag to track if the process is running
+
 
         public string FilePath
         {
@@ -467,6 +546,16 @@ namespace MicroRun
             {
                 isButtonLoading = value;
                 OnPropertyChanged(nameof(IsButtonLoading));
+            }
+        }
+
+        public bool IsChecked
+        {
+            get => isChecked;
+            set
+            {
+                isChecked = value;
+                OnPropertyChanged(nameof(IsChecked));
             }
         }
         [JsonIgnore]
