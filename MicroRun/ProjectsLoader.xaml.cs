@@ -11,6 +11,7 @@ using Microsoft.Build.Execution;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Locator;
 using Microsoft.Build.Logging;
+using Microsoft.WindowsAPICodePack.Dialogs;
 
 
 
@@ -26,22 +27,21 @@ namespace MicroRun
            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
            "SavedFile.json"
        );
-        private bool isStartAllProject = false;
+
         public ProjectsLoader()
         {
             InitializeComponent();
             FilesList.ItemsSource = Files;
             RegisterMSBuild();
             loadMultipleFile();
-            StartAllProject.Content = "Start All Projects";
         }
 
-       public async void loadMultipleFile() {
+        public async void loadMultipleFile() {
             List<FileViewModel> filesViewModels;
             filesViewModels = await LoadMultipleFromStorageAsync(path);
 
-            foreach (var fileViewModel in filesViewModels) { 
-            Files.Add(fileViewModel);
+            foreach (var fileViewModel in filesViewModels) {
+                Files.Add(fileViewModel);
                 LoadLaunchConfigurations(fileViewModel);
             }
         }
@@ -80,7 +80,7 @@ namespace MicroRun
             } catch (Exception ex) {
                 MessageBox.Show("Something went wrong.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
-                      
+
         }
 
 
@@ -123,7 +123,7 @@ namespace MicroRun
 
                     }
                 }
-                catch(Exception ex) {
+                catch (Exception ex) {
                     MessageBox.Show("SomeThing went wrong", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
@@ -138,7 +138,7 @@ namespace MicroRun
 
                 var json = await File.ReadAllTextAsync(filePath);
                 return JsonSerializer.Deserialize<FileViewModel>(json);
-            }catch(Exception ex)
+            } catch (Exception ex)
             {
                 return null;
 
@@ -154,6 +154,8 @@ namespace MicroRun
                 string launchSettingsPath = Path.Combine(Path.GetDirectoryName(file.FilePath), "Properties", "launchSettings.json");
                 if (File.Exists(launchSettingsPath))
                 {
+                    file.EnableStartProject = true;
+                    file.EnableStartProject = true;
 
                     string jsonText = File.ReadAllText(launchSettingsPath);
                     var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
@@ -184,36 +186,69 @@ namespace MicroRun
 
         private async void StartAllProject_Click(object sender, RoutedEventArgs e)
         {
-            if (!isStartAllProject)
+
             {
                 foreach (var fileViewModel in Files)
                 {
-                    if (fileViewModel.IsChecked)
+                    if (fileViewModel.IsChecked && !fileViewModel.IsProcessRunning)
                     {
                         var selectedProfile = launchProfiles[fileViewModel.SelectedConfiguration];
                         StartProject(fileViewModel, selectedProfile);
                         fileViewModel.IsProcessRunning = true;
+                        fileViewModel.IsEnableBrowserButton = false;
                     }
-                }
-                    StartAllProject.Content = "Stop All Projects";
-                    isStartAllProject = true;
-            }
-            else
-            {
-                foreach (var fileViewModel in Files)
-                {
-                    if (fileViewModel.IsChecked&&fileViewModel.IsProcessRunning)
-                    {
-                        StopProject(fileViewModel.FilePath);
-                        fileViewModel.IsProcessRunning = false;
-                    }
-                StartAllProject.Content = "Start All Projects";
-                isStartAllProject = false;
                 }
 
             }
         }
 
+        private async void StopAllProject_Click(object sender, RoutedEventArgs e) {
+
+
+            foreach (var fileViewModel in Files)
+            {
+                if (fileViewModel.IsChecked && fileViewModel.IsProcessRunning)
+                {
+                    StopProject(fileViewModel.FilePath);
+                    fileViewModel.IsProcessRunning = false;
+                    fileViewModel.IsEnableBrowserButton = true;
+                }
+            }
+
+        }
+
+        private async void OpendSelectedProjectFolder_Click(object sender, RoutedEventArgs e) {
+            var fileViewModel = (sender as Button)?.DataContext as FileViewModel;
+            string initialDirectory = string.IsNullOrEmpty(fileViewModel.FilePath)
+       ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) // Default to My Documents if FilePath is null or empty
+       : Path.GetDirectoryName(fileViewModel.FilePath);
+            try
+            {
+                var folderDialog = new CommonOpenFileDialog
+                {
+                    Title = "Select a Folder",
+                    InitialDirectory = initialDirectory // Set initial directory
+                };
+
+                if (folderDialog.ShowDialog() == CommonFileDialogResult.Ok) // Modern API with better UI
+                {
+                    string selectedFolderPath = folderDialog.FileName;
+                    MessageBox.Show($"Selected folder: {selectedFolderPath}", "Folder Selected", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                    // Update FilePath in ViewModel if needed
+                    var viewModel = DataContext as FileViewModel;
+                    if (viewModel != null)
+                    {
+                        viewModel.FilePath = selectedFolderPath;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Something went wrong: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    
 
         private async void StartStopButton_Click(object sender, RoutedEventArgs e)
         {
@@ -229,6 +264,7 @@ namespace MicroRun
                     // Stop the process
                     StopProject(fileViewModel.FilePath);
                     fileViewModel.IsProcessRunning = false;
+                    fileViewModel.IsEnableBrowserButton = true;
                 }
                 else
                 {
@@ -236,6 +272,7 @@ namespace MicroRun
                     var selectedProfile = launchProfiles[fileViewModel.SelectedConfiguration];
                     StartProject(fileViewModel, selectedProfile);
                     fileViewModel.IsProcessRunning = true;
+                    fileViewModel.IsEnableBrowserButton = false;
                 }
 
                 fileViewModel.IsButtonLoading = false;
@@ -273,6 +310,13 @@ namespace MicroRun
 
         }
 
+        //open file in browser
+
+        private async void OpenBrowser_Button(object sender, RoutedEventArgs e)
+        {
+
+        }
+
         // Starts the specified project with the given launch profile
         private void StartProject(FileViewModel fileViewModel, LaunchProfile profile)
         {
@@ -297,6 +341,7 @@ namespace MicroRun
                 var selectedProfileName = fileViewModel.SelectedConfiguration;
                 var launchProfile = launchProfiles[selectedProfileName];
                 // Determine the command to run based on the commandName
+                
                 string commandName = launchProfile.CommandName;
                 string arguments = "";
                 if (commandName == "Project")
@@ -335,6 +380,8 @@ namespace MicroRun
             {
                 MessageBox.Show($"Something want wrong.: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+
+
         }
 
         private void StartProcess(string projectPath, string fileName, string arguments, LaunchProfile launchProfile)
@@ -385,6 +432,7 @@ namespace MicroRun
                 if (fileViewModel != null)
                 {
                     fileViewModel.IsProcessRunning = true;
+                    fileViewModel.IsEnableBrowserButton = false;
                 }
             }
             catch (Exception ex) {
@@ -408,6 +456,7 @@ namespace MicroRun
 
         private void BuildProject(FileViewModel fileViewModel)
         {
+            fileViewModel.StartStopButtonText ="Build...";
             var projectCollection = new ProjectCollection();
             var project = projectCollection.LoadProject(fileViewModel.FilePath);
             var buildParameters = new BuildParameters(projectCollection)
@@ -421,6 +470,8 @@ namespace MicroRun
                 MessageBox.Show("Build failed. Please check the output for errors.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+
 
         private string GetOutputDllPath(string projectPath)
         {
@@ -452,12 +503,6 @@ namespace MicroRun
             var uri = new Uri(url.Split(';')[0]); // Handle multiple URLs
             return uri.Port;
         }
-
-        //private void Button_Main_Click(object sender, RoutedEventArgs e)
-        //{
-        //    MainWindow mainWindow = new MainWindow();
-        //    mainWindow.Show();
-        //}
     }
 
     // Helper classes for deserializing launchSettings.json
@@ -492,14 +537,14 @@ namespace MicroRun
 
     public class FileViewModel : INotifyPropertyChanged
     {
-        [JsonIgnore]
         private bool isButtonLoading;
         private bool isChecked=false;
         private string filePath;
         private string selectedConfiguration;
         private string startStopButtonText = "Start"; // Default text for the button
         private bool isProcessRunning = false;// Flag to track if the process is running
-
+        private bool isEnableStartProject = false;
+        private bool isEnableBrowserButton= true;
 
         public string FilePath
         {
@@ -515,7 +560,7 @@ namespace MicroRun
         // Computed property to return only the file name
         public string FileName
         {
-            get => string.IsNullOrEmpty(FilePath) ? string.Empty : Path.GetFileName(FilePath);
+            get => string.IsNullOrEmpty(FilePath) ? string.Empty : Path.GetFileNameWithoutExtension(FilePath);
             set
             {
                 if (!string.IsNullOrEmpty(FilePath))
@@ -549,6 +594,27 @@ namespace MicroRun
             }
         }
 
+        [JsonIgnore]
+        public bool IsEnableBrowserButton
+        {
+            get => isEnableBrowserButton;
+            set
+            {
+                isEnableBrowserButton = value;
+                OnPropertyChanged(nameof(IsEnableBrowserButton));
+            }
+        }
+
+        public bool EnableStartProject
+        {
+            get => isEnableStartProject;
+            set
+            {
+                isEnableStartProject = value;
+                OnPropertyChanged(nameof(EnableStartProject));
+            }
+        }
+
         public bool IsChecked
         {
             get => isChecked;
@@ -575,7 +641,9 @@ namespace MicroRun
             set
             {
                 isProcessRunning = value;
-                StartStopButtonText = isProcessRunning ? "Stop" : "Start"; // Change button text based on process state
+                StartStopButtonText = isProcessRunning ? "Stop" : "Start";// Change button text based on process state
+                IsEnableBrowserButton = !isProcessRunning;
+                OnPropertyChanged(nameof(IsEnableBrowserButton));
                 OnPropertyChanged(nameof(IsProcessRunning));
             }
         }
